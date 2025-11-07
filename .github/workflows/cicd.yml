@@ -10,14 +10,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    #  Checkout code
+    # -------------------------
+    # Checkout code
     - name: Checkout code
       uses: actions/checkout@v3
 
-    #  Set up Docker Buildx
+    # -------------------------
+    # Set up Docker Buildx
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
 
+    # -------------------------
     # Log in to Docker Hub
     - name: Log in to Docker Hub
       uses: docker/login-action@v2
@@ -25,38 +28,52 @@ jobs:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
 
-    # Build & Push Backend
+    # -------------------------
+    # Build & Push Backend with cache
     - name: Build & Push Backend
       uses: docker/build-push-action@v5
       with:
         context: ./backend
+        file: ./backend/Dockerfile
         push: true
         tags: melvinsamuel070/scaler:latest
+        cache-from: type=registry,ref=melvinsamuel070/scaler:latest
+        cache-to: type=registry,ref=melvinsamuel070/scaler:cache,mode=max
 
-    # Build & Push Frontend
+    # -------------------------
+    # Build & Push Frontend with cache
     - name: Build & Push Frontend
       uses: docker/build-push-action@v5
       with:
         context: ./frontend
+        file: ./frontend/Dockerfile
         push: true
         tags: melvinsamuel070/frontendscaler:latest
+        cache-from: type=registry,ref=melvinsamuel070/frontendscaler:latest
+        cache-to: type=registry,ref=melvinsamuel070/frontendscaler:cache,mode=max
 
-    #  Build & Push AI Microservice
+    # -------------------------
+    # Build & Push AI Microservice with cache
     - name: Build & Push AI
       uses: docker/build-push-action@v5
       with:
         context: ./scaler-ai
+        file: ./scaler-ai/Dockerfile
         push: true
         tags: melvinsamuel070/scaler-ai:latest
+        cache-from: type=registry,ref=melvinsamuel070/scaler-ai:latest
+        cache-to: type=registry,ref=melvinsamuel070/scaler-ai:cache,mode=max
 
-    #  Set up kubectl
+    # -------------------------
+    # Install kubectl
     - name: Install kubectl
       run: |
         sudo curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
         sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
         kubectl version --client
 
-    #  Apply Kubernetes manifests
+    # -------------------------
+    # Apply Kubernetes manifests & restart deployments
     - name: Deploy to Kubernetes
       env:
         KUBECONFIG: ${{ secrets.KUBECONFIG }}
