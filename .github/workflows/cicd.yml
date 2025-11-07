@@ -52,17 +52,17 @@ jobs:
         cache-from: type=registry,ref=melvinsamuel070/frontendscaler:latest
         cache-to: type=registry,ref=melvinsamuel070/frontendscaler:cache,mode=max
 
-    # -------------------------
-    # Build & Push AI Microservice with cache
-    - name: Build & Push AI
-      uses: docker/build-push-action@v5
-      with:
-        context: ./scaler-ai
-        file: ./scaler-ai/Dockerfile
-        push: true
-        tags: melvinsamuel070/scaler-ai:latest
-        cache-from: type=registry,ref=melvinsamuel070/scaler-ai:latest
-        cache-to: type=registry,ref=melvinsamuel070/scaler-ai:cache,mode=max
+    # # -------------------------
+    # # Build & Push AI Microservice with cache
+    # - name: Build & Push AI
+    #   uses: docker/build-push-action@v5
+    #   with:
+    #     context: ./scaler-ai
+    #     file: ./scaler-ai/Dockerfile
+    #     push: true
+    #     tags: melvinsamuel070/scaler-ai:latest
+    #     cache-from: type=registry,ref=melvinsamuel070/scaler-ai:latest
+    #     cache-to: type=registry,ref=melvinsamuel070/scaler-ai:cache,mode=max
 
     # -------------------------
     # Install kubectl
