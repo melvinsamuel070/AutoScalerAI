@@ -53,6 +53,20 @@ jobs:
         cache-to: type=registry,ref=melvinsamuel070/frontend:cache,mode=max
 
     # -------------------------
+    # Set up Kind (Kubernetes-in-Docker)
+    - name: Set up Kind
+      uses: engineerd/setup-kind@v0.5.0
+      with:
+        version: v0.20.0
+
+    # -------------------------
+    # Load Docker images into Kind cluster
+    - name: Load Docker images into Kind
+      run: |
+        kind load docker-image melvinsamuel070/backend:latest
+        kind load docker-image melvinsamuel070/frontend:latest
+
+    # -------------------------
     # Set up kubectl
     - name: Install kubectl
       run: |
