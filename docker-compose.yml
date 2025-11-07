@@ -1,0 +1,40 @@
+
+services:
+  backend:
+    build: ./backend
+    image: melvinsamuel070/scaler:latest
+    container_name: backend_app
+    env_file:
+      - .env
+    ports:
+      - "${PORT}:${PORT}"
+    networks:
+      - autoscaler_network
+    restart: always
+
+  frontend:
+    build: ./frontend
+    image: melvinsamuel070/frontendscaler:latest
+    container_name: frontend_app
+    ports:
+      - "3600:3000"
+    depends_on:
+      - backend
+    networks:
+      - autoscaler_network
+    restart: always
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    volumes:
+      - ./Prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - autoscaler_network
+    restart: always
+
+networks:
+  autoscaler_network:
+    driver: bridge
