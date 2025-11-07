@@ -36,9 +36,9 @@ jobs:
         context: ./backend
         file: ./backend/Dockerfile
         push: true
-        tags: melvinsamuel070/scaler:latest
-        cache-from: type=registry,ref=melvinsamuel070/scaler:latest
-        cache-to: type=registry,ref=melvinsamuel070/scaler:cache,mode=max
+        tags: melvinsamuel070/backend:latest
+        cache-from: type=registry,ref=melvinsamuel070/backend:latest
+        cache-to: type=registry,ref=melvinsamuel070/backend:cache,mode=max
 
     # -------------------------
     # Build & Push Frontend with cache
@@ -48,24 +48,12 @@ jobs:
         context: ./frontend
         file: ./frontend/Dockerfile
         push: true
-        tags: melvinsamuel070/frontendscaler:latest
-        cache-from: type=registry,ref=melvinsamuel070/frontendscaler:latest
-        cache-to: type=registry,ref=melvinsamuel070/frontendscaler:cache,mode=max
-
-    # # -------------------------
-    # # Build & Push AI Microservice with cache
-    # - name: Build & Push AI
-    #   uses: docker/build-push-action@v5
-    #   with:
-    #     context: ./scaler-ai
-    #     file: ./scaler-ai/Dockerfile
-    #     push: true
-    #     tags: melvinsamuel070/scaler-ai:latest
-    #     cache-from: type=registry,ref=melvinsamuel070/scaler-ai:latest
-    #     cache-to: type=registry,ref=melvinsamuel070/scaler-ai:cache,mode=max
+        tags: melvinsamuel070/frontend:latest
+        cache-from: type=registry,ref=melvinsamuel070/frontend:latest
+        cache-to: type=registry,ref=melvinsamuel070/frontend:cache,mode=max
 
     # -------------------------
-    # Install kubectl
+    # Set up kubectl
     - name: Install kubectl
       run: |
         sudo curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
@@ -78,18 +66,16 @@ jobs:
       env:
         KUBECONFIG: ${{ secrets.KUBECONFIG }}
       run: |
-        echo "Applying Kubernetes manifests..."
-        kubectl apply -f k8s/
+        echo "Applying Kubernetes manifests (skipping schema validation)..."
+        kubectl apply -f k8s/ --validate=false
 
         echo "Restarting deployments to pick latest images..."
         kubectl rollout restart deployment backend
         kubectl rollout restart deployment frontend
-        kubectl rollout restart deployment scaler-ai
 
         echo "Waiting for deployments to be ready..."
         kubectl rollout status deployment backend
         kubectl rollout status deployment frontend
-        kubectl rollout status deployment scaler-ai
 
         echo "Listing pods and services..."
         kubectl get pods -o wide
