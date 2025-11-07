@@ -1,0 +1,79 @@
+name: AutoScaler.AI CI/CD
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    #  Checkout code
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    #  Set up Docker Buildx
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    # Log in to Docker Hub
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    # Build & Push Backend
+    - name: Build & Push Backend
+      uses: docker/build-push-action@v5
+      with:
+        context: ./backend
+        push: true
+        tags: melvinsamuel070/scaler:latest
+
+    # Build & Push Frontend
+    - name: Build & Push Frontend
+      uses: docker/build-push-action@v5
+      with:
+        context: ./frontend
+        push: true
+        tags: melvinsamuel070/frontendscaler:latest
+
+    #  Build & Push AI Microservice
+    - name: Build & Push AI
+      uses: docker/build-push-action@v5
+      with:
+        context: ./scaler-ai
+        push: true
+        tags: melvinsamuel070/scaler-ai:latest
+
+    #  Set up kubectl
+    - name: Install kubectl
+      run: |
+        sudo curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+        kubectl version --client
+
+    #  Apply Kubernetes manifests
+    - name: Deploy to Kubernetes
+      env:
+        KUBECONFIG: ${{ secrets.KUBECONFIG }}
+      run: |
+        echo "Applying Kubernetes manifests..."
+        kubectl apply -f k8s/
+
+        echo "Restarting deployments to pick latest images..."
+        kubectl rollout restart deployment backend
+        kubectl rollout restart deployment frontend
+        kubectl rollout restart deployment scaler-ai
+
+        echo "Waiting for deployments to be ready..."
+        kubectl rollout status deployment backend
+        kubectl rollout status deployment frontend
+        kubectl rollout status deployment scaler-ai
+
+        echo "Listing pods and services..."
+        kubectl get pods -o wide
+        kubectl get svc -o wide

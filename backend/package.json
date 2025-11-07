@@ -1,0 +1,27 @@
+{
+  "name": "autoscalerai",
+  "version": "1.0.0",
+  "description": "Autoscaler AI backend service for handling requests, MongoDB operations, and exposing Prometheus metrics.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "autoscaler",
+    "backend",
+    "prometheus",
+    "express",
+    "devops",
+    "mongodb",
+    "monitoring"
+  ],
+  "author": "Melvin Samuel",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2",
+    "mongoose": "^7.8.7",
+    "prom-client": "^14.2.0"
+  }
+}
