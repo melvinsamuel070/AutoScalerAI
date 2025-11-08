@@ -63,8 +63,8 @@ jobs:
         minikube version
 
     # -------------------------
-    # Ensure Minikube is running
-    - name: Start Minikube if not running
+    # Start Minikube if not running
+    - name: Start Minikube
       run: |
         echo "Checking Minikube status..."
         if ! minikube status | grep -q "host: Running"; then
@@ -73,10 +73,24 @@ jobs:
         else
           echo "✅ Minikube already running."
         fi
-
         echo "Verifying Minikube readiness..."
         minikube status
-        echo "✅ Minikube is up and ready!"
+
+    # -------------------------
+    # Configure Docker to use Minikube
+    - name: Use Minikube Docker daemon
+      run: |
+        echo "Configuring Docker to use Minikube's Docker daemon..."
+        eval $(minikube -p minikube docker-env)
+
+    # -------------------------
+    # Load images into Minikube
+    - name: Load Docker images into Minikube
+      run: |
+        echo "Loading backend image..."
+        minikube image load melvinsamuel070/backend:latest
+        echo "Loading frontend image..."
+        minikube image load melvinsamuel070/frontend:latest
 
     # -------------------------
     # Install kubectl
@@ -88,21 +102,16 @@ jobs:
         kubectl version --client
 
     # -------------------------
-    # Verify Minikube cluster connection
-    - name: Verify Minikube Connection
-      env:
-        KUBECONFIG: ${{ secrets.KUBECONFIG }}
+    # Set kubectl context to Minikube
+    - name: Configure kubectl context
       run: |
-        echo "Checking Minikube connection..."
-        kubectl cluster-info || (echo "❌ Unable to connect to Minikube" && exit 1)
-        kubectl get nodes || (echo "❌ No nodes found" && exit 1)
-        echo "✅ Minikube cluster verified successfully!"
+        echo "Setting kubectl context to Minikube..."
+        kubectl config use-context minikube
+        kubectl cluster-info
 
     # -------------------------
     # Deploy to Minikube
     - name: Deploy to Minikube
-      env:
-        KUBECONFIG: ${{ secrets.KUBECONFIG }}
       run: |
         echo "Applying Kubernetes manifests (skipping schema validation)..."
         kubectl apply -f k8s/ --validate=false
