@@ -1,129 +1,3 @@
-name: AutoScaler.AI CI/CD
-
-on:
-  push:
-    branches:
-      - master
-
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-
-    steps:
-    # Checkout code
-    - name: Checkout code
-      uses: actions/checkout@v3
-
-    # Install dependencies
-    - name: Install dependencies
-      run: |
-        curl -Lo minikube https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
-        chmod +x minikube
-        sudo mv minikube /usr/local/bin/
-        
-        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-        sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-
-    # Start Minikube
-    - name: Start Minikube
-      run: |
-        minikube start --driver=docker --wait=all --memory=4096 --cpus=2
-        minikube addons enable metrics-server
-
-    # Configure Minikube Docker environment
-    - name: Configure Minikube Docker
-      run: |
-        eval $(minikube -p minikube docker-env)
-
-    # Build images using Minikube's Docker
-    - name: Build Backend Image
-      run: |
-        docker build -t melvinsamuel070/scaler:latest ./backend
-
-    - name: Build Frontend Image
-      run: |
-        docker build -t melvinsamuel070/frontendscaler:latest ./frontend
-
-    # Create namespace and secrets
-    - name: Setup Namespace and Secrets
-      run: |
-        kubectl create namespace autoscalerai --dry-run=client -o yaml | kubectl apply -f -
-        kubectl create secret generic backend-env \
-          --namespace=autoscalerai \
-          --from-literal=DATABASE_URL=sqlite:///app.db \
-          --from-literal=JWT_SECRET=ci-cd-test-secret \
-          --from-literal=API_KEY=ci-cd-test-key \
-          --dry-run=client -o yaml | kubectl apply -f -
-
-    # Deploy to Kubernetes
-    - name: Deploy to Kubernetes
-      run: |
-        # Apply all manifests
-        kubectl apply -f k8s/ --validate=false --namespace=autoscalerai
-        
-        # Force use of local images by setting image pull policy
-        kubectl patch deployment backend -n autoscalerai -p '{"spec":{"template":{"spec":{"containers":[{"name":"backend","imagePullPolicy":"IfNotPresent"}]}}}}'
-        kubectl patch deployment frontend -n autoscalerai -p '{"spec":{"template":{"spec":{"containers":[{"name":"frontend","imagePullPolicy":"IfNotPresent"}]}}}}'
-        
-        # Wait for rollouts
-        kubectl rollout status deployment/backend -n autoscalerai --timeout=180s
-        kubectl rollout status deployment/frontend -n autoscalerai --timeout=180s
-
-    # Verify deployment
-    - name: Verify Deployment
-      run: |
-        echo "=== Pods ==="
-        kubectl get pods -n autoscalerai
-        
-        echo "=== Services ==="
-        kubectl get svc -n autoscalerai
-        
-        echo "=== Deployments ==="
-        kubectl get deployments -n autoscalerai
-
-    # Test the application
-    - name: Test Application
-      run: |
-        # Get frontend URL
-        FRONTEND_URL=$(minikube service frontend-service -n autoscalerai --url)
-        echo "Frontend URL: $FRONTEND_URL"
-        
-        # Wait for application to be ready
-        sleep 30
-        
-        # Test frontend
-        curl -f $FRONTEND_URL || echo "Frontend test completed"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # name: AutoScaler.AI CI/CD
 
 # on:
@@ -136,87 +10,208 @@ jobs:
 #     runs-on: ubuntu-latest
 
 #     steps:
-#     # -------------------------
 #     # Checkout code
 #     - name: Checkout code
 #       uses: actions/checkout@v3
 
-#     # -------------------------
-#     # Install Minikube
-#     - name: Install Minikube
+#     # Install dependencies
+#     - name: Install dependencies
 #       run: |
 #         curl -Lo minikube https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
 #         chmod +x minikube
 #         sudo mv minikube /usr/local/bin/
-#         minikube version
-
-#     # -------------------------
-#     # Start Minikube quickly
-#     - name: Start Minikube
-#       run: |
-#         if ! minikube status | grep -q "host: Running"; then
-#           minikube start --driver=docker --wait=all --memory=4096 --cpus=2 --addons=default-storageclass
-#         fi
-#         minikube status
-
-#     # -------------------------
-#     # Use Minikube Docker daemon
-#     - name: Configure Docker for Minikube
-#       run: |
-#         eval $(minikube -p minikube docker-env)
-#         docker info
-
-#     # -------------------------
-#     # Build images directly in Minikube
-#     - name: Build Backend Image
-#       run: docker build -t backend:latest ./backend
-
-#     - name: Build Frontend Image
-#       run: docker build -t frontend:latest ./frontend
-
-#     # -------------------------
-#     # Install kubectl
-#     - name: Install kubectl
-#       run: |
+        
 #         curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
 #         sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-#         kubectl version --client
 
-#     # -------------------------
-#     # Set kubectl context
-#     - name: Configure kubectl
-#       run: kubectl config use-context minikube
-
-#     # -------------------------
-#     # Deploy to Minikube with minimal delay
-#     - name: Deploy to Minikube
+#     # Start Minikube
+#     - name: Start Minikube
 #       run: |
-#         kubectl apply -f k8s/ --validate=false
+#         minikube start --driver=docker --wait=all --memory=4096 --cpus=2
+#         minikube addons enable metrics-server
 
-#         # Fast rollout
-#         kubectl rollout restart deployment backend
-#         kubectl rollout restart deployment frontend
-
-#         kubectl rollout status deployment backend --timeout=90s || { 
-#           echo "⚠️ Backend rollout issue, showing debug info"; 
-#           kubectl describe deployment backend; 
-#           kubectl get pods -l app=backend -o wide; 
-#           kubectl logs -l app=backend --tail=50 || true; 
-#         }
-
-#         kubectl rollout status deployment frontend --timeout=60s || { 
-#           echo "⚠️ Frontend rollout issue, showing debug info"; 
-#           kubectl describe deployment frontend; 
-#           kubectl get pods -l app=frontend -o wide; 
-#           kubectl logs -l app=frontend --tail=50 || true; 
-#         }
-
-#         kubectl get pods -o wide
-#         kubectl get svc -o wide
-
-#     # -------------------------
-#     # Get Frontend URL
-#     - name: Get Frontend URL
+#     # Configure Minikube Docker environment
+#     - name: Configure Minikube Docker
 #       run: |
-#         FRONTEND_URL=$(minikube service frontend-service --url)
-#         echo "✅ Frontend URL: $FRONTEND_URL"
+#         eval $(minikube -p minikube docker-env)
+
+#     # Build images using Minikube's Docker
+#     - name: Build Backend Image
+#       run: |
+#         docker build -t melvinsamuel070/scaler:latest ./backend
+
+#     - name: Build Frontend Image
+#       run: |
+#         docker build -t melvinsamuel070/frontendscaler:latest ./frontend
+
+#     # Create namespace and secrets
+#     - name: Setup Namespace and Secrets
+#       run: |
+#         kubectl create namespace autoscalerai --dry-run=client -o yaml | kubectl apply -f -
+#         kubectl create secret generic backend-env \
+#           --namespace=autoscalerai \
+#           --from-literal=DATABASE_URL=sqlite:///app.db \
+#           --from-literal=JWT_SECRET=ci-cd-test-secret \
+#           --from-literal=API_KEY=ci-cd-test-key \
+#           --dry-run=client -o yaml | kubectl apply -f -
+
+#     # Deploy to Kubernetes
+#     - name: Deploy to Kubernetes
+#       run: |
+#         # Apply all manifests
+#         kubectl apply -f k8s/ --validate=false --namespace=autoscalerai
+        
+#         # Force use of local images by setting image pull policy
+#         kubectl patch deployment backend -n autoscalerai -p '{"spec":{"template":{"spec":{"containers":[{"name":"backend","imagePullPolicy":"IfNotPresent"}]}}}}'
+#         kubectl patch deployment frontend -n autoscalerai -p '{"spec":{"template":{"spec":{"containers":[{"name":"frontend","imagePullPolicy":"IfNotPresent"}]}}}}'
+        
+#         # Wait for rollouts
+#         kubectl rollout status deployment/backend -n autoscalerai --timeout=180s
+#         kubectl rollout status deployment/frontend -n autoscalerai --timeout=180s
+
+#     # Verify deployment
+#     - name: Verify Deployment
+#       run: |
+#         echo "=== Pods ==="
+#         kubectl get pods -n autoscalerai
+        
+#         echo "=== Services ==="
+#         kubectl get svc -n autoscalerai
+        
+#         echo "=== Deployments ==="
+#         kubectl get deployments -n autoscalerai
+
+#     # Test the application
+#     - name: Test Application
+#       run: |
+#         # Get frontend URL
+#         FRONTEND_URL=$(minikube service frontend-service -n autoscalerai --url)
+#         echo "Frontend URL: $FRONTEND_URL"
+        
+#         # Wait for application to be ready
+#         sleep 30
+        
+#         # Test frontend
+#         curl -f $FRONTEND_URL || echo "Frontend test completed"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+name: AutoScaler.AI CI/CD
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Install dependencies
+      run: |
+        curl -Lo minikube https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+        chmod +x minikube
+        sudo mv minikube /usr/local/bin/
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+
+    - name: Start Minikube
+      run: |
+        minikube start --driver=docker --wait=all --memory=4096 --cpus=2
+        minikube addons enable metrics-server
+
+    - name: Configure Minikube Docker
+      run: |
+        eval $(minikube -p minikube docker-env)
+
+    - name: Build Backend Image
+      run: |
+        docker build -t melvinsamuel070/scaler:latest ./backend
+
+    - name: Build Frontend Image
+      run: |
+        docker build -t melvinsamuel070/frontendscaler:latest ./frontend
+
+    - name: Setup Namespace and Secrets
+      run: |
+        kubectl create namespace autoscalerai --dry-run=client -o yaml | kubectl apply -f -
+        
+        # Backend secret
+        kubectl create secret generic backend-env \
+          --namespace=autoscalerai \
+          --from-literal=DATABASE_URL=sqlite:///app.db \
+          --from-literal=JWT_SECRET=ci-cd-test-secret \
+          --from-literal=API_KEY=ci-cd-test-key \
+          --dry-run=client -o yaml | kubectl apply -f -
+        
+        # Grafana secret
+        kubectl create secret generic grafana-env \
+          --namespace=autoscalerai \
+          --from-literal=GF_SECURITY_ADMIN_PASSWORD=admin \
+          --from-literal=GF_SECURITY_ADMIN_USER=admin \
+          --dry-run=client -o yaml | kubectl apply -f -
+
+    - name: Deploy to Kubernetes
+      run: |
+        kubectl apply -f k8s/ --validate=false --namespace=autoscalerai
+        kubectl rollout status deployment/backend -n autoscalerai --timeout=180s
+        kubectl rollout status deployment/frontend -n autoscalerai --timeout=180s
+        kubectl rollout status deployment/grafana -n autoscalerai --timeout=120s
+
+    - name: Verify Deployment
+      run: |
+        echo "=== Pods ==="
+        kubectl get pods -n autoscalerai
+        
+        echo "=== Services ==="
+        kubectl get svc -n autoscalerai
+        
+        echo "=== Deployments ==="
+        kubectl get deployments -n autoscalerai
+
+    - name: Test Application
+      run: |
+        # Get frontend URL
+        FRONTEND_URL=$(minikube service frontend-service -n autoscalerai --url)
+        echo "Frontend URL: $FRONTEND_URL"
+        
+        # Wait for application to be ready
+        sleep 30
+        
+        # Test frontend
+        curl -f $FRONTEND_URL || echo "Frontend test completed"
+        
+        # Test backend through port-forward
+        timeout 10 kubectl port-forward svc/backend-service 3500:3500 -n autoscalerai &
+        sleep 5
+        curl -f http://localhost:3500/health || echo "Backend health check completed"
