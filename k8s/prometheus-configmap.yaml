@@ -1,3 +1,4 @@
+
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -6,8 +7,57 @@ metadata:
 data:
   prometheus.yml: |
     global:
-      scrape_interval: 5s
+      scrape_interval: 15s
+      evaluation_interval: 15s
+
     scrape_configs:
+      # Your existing backend job
       - job_name: 'backend'
         static_configs:
           - targets: ['backend-service:3500']
+      
+      # Kubernetes nodes metrics
+      - job_name: 'kubernetes-nodes'
+        kubernetes_sd_configs:
+        - role: node
+        relabel_configs:
+        - source_labels: [__address__]
+          regex: '(.*):10250'
+          replacement: '${1}:10255'
+          target_label: __address__
+        - action: labelmap
+          regex: __meta_kubernetes_node_label_(.+)
+
+      # Kubernetes pods metrics
+      - job_name: 'kubernetes-pods'
+        kubernetes_sd_configs:
+        - role: pod
+        relabel_configs:
+        - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+          action: keep
+          regex: true
+        - action: labelmap
+          regex: __meta_kubernetes_pod_label_(.+)
+
+      # cAdvisor container metrics (CRITICAL FOR CPU/MEMORY)
+      - job_name: 'kubernetes-cadvisor'
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        kubernetes_sd_configs:
+        - role: node
+        relabel_configs:
+        - action: labelmap
+          regex: __meta_kubernetes_node_label_(.+)
+        - target_label: __address__
+          replacement: kubernetes.default.svc:443
+        - source_labels: [__meta_kubernetes_node_name]
+          regex: (.+)
+          target_label: __metrics_path__
+          replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
+
+      # Prometheus self-metrics
+      - job_name: 'prometheus'
+        static_configs:
+        - targets: ['localhost:9090']
